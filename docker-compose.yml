@@ -29,17 +29,12 @@ services:
       mc mb myminio/spark-data --ignore-existing && \
       mc mb myminio/spark-data/spark-events --ignore-existing && \
       mc mb myminio/spark-data/spark-libs --ignore-existing && \
-      mc cp /opt/jars/* myminio/spark-data/spark-libs/ && \
+      mc cp /opt/jars/* myminio/spark-data/spark-libs/ --recursive && \
       mc mb myminio/production --ignore-existing && \
       mc mb myminio/development --ignore-existing && \
       mc mb myminio/development/$MINIO_BUCKET_LANDING --ignore-existing && \
-      mc mb myminio/development/$MINIO_BUCKET_SPARK --ignore-existing && \
-      mc mb myminio/development/$MINIO_BUCKET_SPARK/spark-events --ignore-existing && \
-      mc mb myminio/development/$MINIO_BUCKET_SPARK/spark-libs --ignore-existing
-      mc mb myminio/production/MINIO_BUCKET_LANDING --ignore-existing && \
-      mc mb myminio/production/MINIO_BUCKET_SPARK --ignore-existing && \
-      mc mb myminio/production/MINIO_BUCKET_SPARK/spark-events --ignore-existing && \
-      mc mb myminio/production/MINIO_BUCKET_SPARK/spark-libs --ignore-existing
+      mc mb myminio/production/$MINIO_BUCKET_LANDING --ignore-existing && \
+      mc mb myminio/production/warehouse --ignore-existing
       "
     env_file:
       - .env
@@ -93,7 +88,48 @@ services:
       - ./jobs:/opt/spark/jobs
       - ./data:/opt/spark/local-data
       - spark-data:/opt/spark/spark-events
+
+  metastore-db:
+    container_name: metastore-db
+    hostname: metastore-db
+    image: postgres:13.0
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=hive
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=metastore_db
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "poc" ]
+      interval: 5s
+      retries: 5
+
+  hive-metastore:
+    container_name: hive-metastore
+    hostname: hive-metastore
+    image: apache/hive:4.0.0
+    ports:
+      - 9083:9083 
+    volumes:
+      - ./config/hive/hive-core-site.xml:/opt/hadoop-3.3.6/etc/hadoop/core-site.xml:ro
+      - ./config/hive/hive-metastore-site.xml:/opt/hive/conf/metastore-site.xml:ro
+      - ./jars/postgresql-42.5.1.jar:/opt/hive/lib/postgres.jar
+      - ./jars/hadoop-aws-3.3.4.jar:/opt/hive/lib/hadoop-aws.jar
+      - ./jars/delta-storage-3.2.0:/opt/hive/lib/delta-storage.jar
+      - ./jars/delta-spark_2.12-3.2.0:/opt/hive/lib/delta-storage.jar
+      - ./jars/aws-java-sdk-bundle-1.11.1026.jar:/opt/hive/lib/aws-java-sdk-bundle.jar
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - METASTORE_DB_HOSTNAME=metastore-db
+      - VERBOSE=true
+    depends_on:
+      - metastore-db
+      - minio
  
 volumes:
   minio-data: 
   spark-data:
+  postgres_data:

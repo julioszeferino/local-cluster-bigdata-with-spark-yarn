@@ -13,7 +13,7 @@
 ## How to start the services
 
 ```bash
-docker compose -f docker-compose.yml up -d --scale cluster-spark-worker=1
+docker compose -f docker-compose.yml up -d --scale cluster-spark-worker=3
 ```
 
 ## Usage with Spark
