@@ -160,3 +160,12 @@ Hive Metastore: Available via Spark SQL (no direct web UI)
 - **Connection errors:** Ensure Hive Metastore service is running before starting Spark jobs that access tables.
 - **Schema evolution:** When table schemas change, use `REFRESH TABLE` or `MSCK REPAIR TABLE` to update metadata.
 
+## configs trino
+
+docker compose exec trino-coordinator bash
+> trino
+```sql
+CREATE SCHEMA minio.bronze WITH (location = 's3a://production/catalog/');
+quit
+```
+>exit
