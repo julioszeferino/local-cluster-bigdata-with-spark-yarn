@@ -10,6 +10,13 @@
       - `spark-data/spark-events`
       - `spark-data/spark-libs`
 
+- **Hive Metastore**: Centralized metadata repository for Spark and Hive.
+  - Uses PostgreSQL as the backend database
+  - Stores table schemas, partitions, and storage locations
+  - Enables data catalog functionality for Spark SQL
+
+- **PostgreSQL**: Database backend for Hive Metastore.
+
 ## How to start the services
 
 ```bash
@@ -21,6 +28,26 @@ docker compose -f docker-compose.yml up -d --scale cluster-spark-worker=3
 - Spark does not create buckets automatically, only directories inside existing buckets.
 - Make sure the `development` and `spark-data` buckets exist in MinIO before running Spark scripts.
 - Directories (paths) are created automatically by Spark during write operations.
+- With Hive Metastore, you can create managed and external tables that persist metadata across Spark sessions.
+
+## Hive Metastore Integration
+
+The Hive Metastore service provides:
+- **Persistent metadata storage**: Table schemas and locations are stored in PostgreSQL
+- **Cross-session data access**: Tables created in one Spark session are available in others
+- **Data catalog functionality**: Use `SHOW TABLES`, `DESCRIBE TABLE`, etc.
+- **Partition management**: Automatic partition discovery and management
+
+### Creating tables with Hive Metastore:
+```sql
+-- Create external table pointing to MinIO
+CREATE TABLE IF NOT EXISTS my_table (
+    id INT,
+    name STRING,
+    created_at TIMESTAMP
+) USING DELTA
+LOCATION 's3a://development/tables/my_table'
+```
 
 ## Spark Deploy Modes
 
@@ -77,6 +104,7 @@ docker exec cluster-spark-master spark-submit --master yarn --deploy-mode cluste
 - `config/spark/spark-defaults-yarn.conf`: Default Spark configuration for YARN mode
 - `config/hadoop/*.xml`: Hadoop configuration files
 - `config/spark/jupyter.dockerfile`: Jupyter notebook with Spark integration
+- `config/hive/`: Hive Metastore configuration files
 
 ## Testing the MinIO service and buckets
 
@@ -98,12 +126,14 @@ If everything is working, you will see success messages for MinIO and each bucke
 - `jobs/local_tests/read_files_from_minio.py`: Spark script that reads files from MinIO.
 - `config/spark/`: Spark configuration files including spark-defaults for YARN.
 - `config/hadoop/`: Hadoop configuration files.
+- `config/hive/`: Hive Metastore configuration files.
 
 ## Access
 
 MinIO Console: [http://localhost:9001](http://localhost:9001)  
 Spark History: [http://localhost:18080](http://localhost:18080)  
 YARN ResourceManager: [http://localhost:8088](http://localhost:8088)  
+Hive Metastore: Available via Spark SQL (no direct web UI)
 
 ## Best Practices
 
@@ -116,6 +146,8 @@ YARN ResourceManager: [http://localhost:8088](http://localhost:8088)
 - **Dependencies:** Document and manage Python and JAR dependencies for reproducibility. Use requirements.txt for Python and keep JARs versioned.
 - **Security:** If exposing services outside localhost, configure authentication and network policies for MinIO and Spark.
 - **Deploy Mode:** Use client mode for development/debugging and cluster mode for production.
+- **Hive Metastore:** Use external tables for data stored in MinIO to maintain data location flexibility.
+- **Table Management:** Regularly clean up unused tables and partitions to maintain Metastore performance.
 
 ## Troubleshooting
 
@@ -124,4 +156,7 @@ YARN ResourceManager: [http://localhost:8088](http://localhost:8088)
 - For Spark job failures, review the YARN ResourceManager logs and Spark History Server for details.
 - If cluster mode fails but client mode works, check that all dependencies are available on cluster nodes.
 - Event logs are stored in `s3a://spark-data/spark-events` and accessible via Spark History Server.
+- **Hive Metastore issues:** Check PostgreSQL container logs if tables are not persisting or metadata queries fail.
+- **Connection errors:** Ensure Hive Metastore service is running before starting Spark jobs that access tables.
+- **Schema evolution:** When table schemas change, use `REFRESH TABLE` or `MSCK REPAIR TABLE` to update metadata.
 
