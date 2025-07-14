@@ -1,0 +1,20 @@
+[
+    {
+        "id": 1,
+        "produto": "Notebook",
+        "quantidade_estoque": 10,
+        "local": "Almoxarifado A"
+    },
+    {
+        "id": 2,
+        "produto": "Mouse",
+        "quantidade_estoque": 50,
+        "local": "Almoxarifado B"
+    },
+    {
+        "id": 3,
+        "produto": "Teclado",
+        "quantidade_estoque": 30,
+        "local": "Almoxarifado A"
+    }
+]

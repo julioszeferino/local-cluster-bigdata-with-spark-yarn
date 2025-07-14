@@ -25,14 +25,68 @@ services:
       - minio
     entrypoint: >
       sh -c "
-      mc alias set myminio http://minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && \
-      mc mb myminio/$MINIO_BUCKET_LANDING && \
-      mc mb myminio/$MINIO_BUCKET_SPARK && \
-      mc mb myminio/$MINIO_BUCKET_SPARK/spark-events && \
-      mc mb myminio/$MINIO_BUCKET_SPARK/spark-libs
+      mc alias set myminio http://minio:9000 minioadmin minioadmin && \
+      mc mb myminio/production --ignore-existing && \
+      mc mb myminio/development --ignore-existing && \
+      mc mb myminio/development/$MINIO_BUCKET_LANDING --ignore-existing && \
+      mc mb myminio/development/$MINIO_BUCKET_SPARK --ignore-existing && \
+      mc mb myminio/development/$MINIO_BUCKET_SPARK/spark-events --ignore-existing && \
+      mc mb myminio/development/$MINIO_BUCKET_SPARK/spark-libs --ignore-existing
+      mc mb myminio/production/MINIO_BUCKET_LANDING --ignore-existing && \
+      mc mb myminio/production/MINIO_BUCKET_SPARK --ignore-existing && \
+      mc mb myminio/production/MINIO_BUCKET_SPARK/spark-events --ignore-existing && \
+      mc mb myminio/production/MINIO_BUCKET_SPARK/spark-libs --ignore-existing
       "
     env_file:
       - .env
 
+  cluster-spark-master:
+    container_name: cluster-spark-master
+    build: 
+      context: .
+      dockerfile: docker/spark.dockerfile
+    image: cluster-spark:latest
+    depends_on:
+      - minio
+      - minio-mc
+    entrypoint: ['./entrypoint.sh', 'master']
+    ports:
+      - '9090:9090'
+      - '7077:7077'
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./data:/opt/spark/local-data
+      - spark-data:/opt/spark/spark-events
+    restart: always
+    env_file:
+      - .env
+
+  cluster-spark-history-server:
+    container_name: cluster-spark-history-server
+    image: cluster-spark:latest
+    entrypoint: ['./entrypoint.sh', 'history']
+    depends_on:
+      - cluster-spark-master
+    ports:
+      - '18080:18080'
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - spark-data:/opt/spark/spark-events
+
+  cluster-spark-worker:
+    image: cluster-spark:latest
+    entrypoint: ['./entrypoint.sh', 'worker']
+    depends_on:
+      - cluster-spark-master
+    env_file:
+      - .env
+    volumes:
+      - ./jobs:/opt/spark/jobs
+      - ./data:/opt/spark/local-data
+      - spark-data:/opt/spark/spark-events
+ 
 volumes:
-  minio-data:
+  minio-data: 
+  spark-data:
