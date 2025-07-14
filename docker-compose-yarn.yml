@@ -26,6 +26,10 @@ services:
     entrypoint: >
       sh -c "
       mc alias set myminio http://minio:9000 minioadmin minioadmin && \
+      mc mb myminio/spark-data --ignore-existing && \
+      mc mb myminio/spark-data/spark-events --ignore-existing && \
+      mc mb myminio/spark-data/spark-libs --ignore-existing && \
+      mc cp /opt/jars/* myminio/spark-data/spark-libs/ && \
       mc mb myminio/production --ignore-existing && \
       mc mb myminio/development --ignore-existing && \
       mc mb myminio/development/$MINIO_BUCKET_LANDING --ignore-existing && \
@@ -39,20 +43,23 @@ services:
       "
     env_file:
       - .env
+    volumes:
+      - ./jars:/opt/jars
 
   cluster-spark-master:
     container_name: cluster-spark-master
     build: 
       context: .
-      dockerfile: docker/spark.dockerfile
-    image: cluster-spark:latest
+      dockerfile: docker/spark-yarn.dockerfile
+    image: cluster-spark-yarn:latest
     depends_on:
       - minio
       - minio-mc
     entrypoint: ['./entrypoint.sh', 'master']
     ports:
-      - '9090:9090'
+      - '9870:9870'
       - '7077:7077'
+      - '8088:8088'
     volumes:
       - ./jobs:/opt/spark/jobs
       - ./data:/opt/spark/local-data
@@ -63,7 +70,7 @@ services:
 
   cluster-spark-history-server:
     container_name: cluster-spark-history-server
-    image: cluster-spark:latest
+    image: cluster-spark-yarn:latest
     entrypoint: ['./entrypoint.sh', 'history']
     depends_on:
       - cluster-spark-master
@@ -76,7 +83,7 @@ services:
       - spark-data:/opt/spark/spark-events
 
   cluster-spark-worker:
-    image: cluster-spark:latest
+    image: cluster-spark-yarn:latest
     entrypoint: ['./entrypoint.sh', 'worker']
     depends_on:
       - cluster-spark-master
