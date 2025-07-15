@@ -128,8 +128,58 @@ services:
     depends_on:
       - metastore-db
       - minio
+
+  trino-coordinator:
+    image: trinodb/trino:458
+    container_name: trino-coordinator
+    hostname: trino-coordinator
+    environment:
+      - TRINO_NODE_ID=coordinator
+      - TRINO_NODE_ENVIRONMENT=production
+    ports:
+      - 8080:8080
+    volumes:
+      - trino_data:/etc/trino
+      - ./config/trino/catalog:/etc/trino/catalog
+      - ./config/trino/coordinator-config.properties:/etc/trino/config.properties
+      - ./config/trino/node.properties:/etc/trino/node.properties
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  trino-worker1:
+    image: trinodb/trino:458
+    hostname: trino-worker
+    depends_on:
+      trino-coordinator:
+        condition: service_healthy
+    environment:
+      - TRINO_NODE_ID=worker1
+      - TRINO_NODE_ENVIRONMENT=production
+    volumes:
+      - trino_data:/etc/trino
+      - ./config/trino/worker-config.properties:/etc/trino/config.properties
+      - ./config/trino/node.properties:/etc/trino/node.properties
+
+  
+  trino-worker2:
+    image: trinodb/trino:458
+    hostname: trino-worker
+    depends_on:
+      trino-coordinator:
+        condition: service_healthy
+    environment:
+      - TRINO_NODE_ID=worker2
+      - TRINO_NODE_ENVIRONMENT=production
+    volumes:
+      - trino_data:/etc/trino
+      - ./config/trino/worker-config.properties:/etc/trino/config.properties
+      - ./config/trino/node.properties:/etc/trino/node.properties
  
 volumes:
   minio-data: 
   spark-data:
   postgres_data:
+  trino_data:
